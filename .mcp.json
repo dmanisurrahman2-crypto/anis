@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "sls-zonwering": {
+            "type": "http",
+            "url": "https://www.slszonwering.nl/wp-json/custom-web-render/v1/mcp",
+            "headers": {
+                "Authorization": "Bearer ${SLS_ZONWERING_TOKEN}"
+            }
+        }
+    }
+}
