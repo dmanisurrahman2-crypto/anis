@@ -1,56 +1,55 @@
 ---
 name: sls-zonwering-page-publish
-description: Generate and publish a SEO-friendly, AEO+GEO optimized, mobile-responsive landing page on slszonwering.nl following the SLS Zonwering design template. Use when the user says "create page", "publish page", "maak een pagina", "nieuwe pagina", "add page to slszonwering", "publish to slszonwering", or any request to build a new page on the SLS Zonwering WordPress site. Handles full pipeline: keyword → copy → HTML → WordPress MCP publish.
+description: Generate and publish a SEO-friendly, AEO+GEO optimized, mobile-responsive local landing page on slszonwering.nl for a specific city/plaats ("zonwering in {plaats}") following the SLS Zonwering design template. Use when the user says "create page", "publish page", "make a page about", "new landing page", "add page to slszonwering", "maak een pagina", "publish to slszonwering", "zonwering pagina voor {stad}", or any request to build a new location or product page on the SLS Zonwering WordPress site. Handles full pipeline: plaats/keyword → copy → HTML → WordPress MCP publish.
 ---
 
 # SLS Zonwering Page Publisher
 
-This skill generates and publishes a complete SEO/AEO/GEO-optimized landing page on **slszonwering.nl** following a design template modeled on the QuasarAISEO page-publish pipeline. One request → one published page.
+This skill generates and publishes a complete SEO/AEO/GEO-optimized local landing page on **slszonwering.nl** following the established SLS Zonwering design template. One request → one published page.
 
-> **Unverified template — read before using.** This SKILL.md was drafted without being able to load `https://www.slszonwering.nl/` or connect the `sls-zonwering` MCP server: this environment's network egress proxy blocks the `www.slszonwering.nl` host entirely (confirmed via both a direct fetch attempt and the MCP connection, which failed with `AUTH_HEADER_REJECTED` / "no rule or allowlist entry allows host www.slszonwering.nl"). That means:
-> - The **design tokens** below (colors, fonts, section layout) are placeholders inspired by the QuasarAISEO template, not the real SLS Zonwering brand — nobody has inspected the live site's actual look.
-> - The **publish tool name** (`create_content`, `get_content`) is inferred only from the fact that the MCP endpoint path (`/wp-json/custom-web-render/v1/mcp`) matches the same "Custom Web Render" WordPress plugin route used on quasaraiseo.com — plausible, but unconfirmed.
-> - Business specifics (product names, tone, CTA URL) are generic assumptions for a Dutch *zonwering* (sun-shading: screens, rolluiken, markiezen, terrasoverkappingen) company.
->
-> Before relying on this skill for a real publish: fix the network/allowlist issue so the `sls-zonwering` MCP server can connect (or open the site from a machine that isn't blocked), pull the real brand colors/fonts/logo and an actual example page, and update this file's §Design system and §Publish parameters accordingly.
+> **Note on this skill file**: this skill was drafted from what is publicly visible about slszonwering.nl (site content, product range, existing local-landing-page URLs found via search) — automated fetching of the live page source was blocked by the site's robots.txt, so the exact CSS tokens (hex colors, fonts, spacing) below are a **best-estimate design system**, not confirmed from the actual stylesheet. Before first use, open one real published page (e.g. `/zonwering-in-zwijndrecht/`) in a browser, inspect the CSS, and update the §Design system section with the real values. Everything else (pipeline, section structure, SEO rules) is a reusable template regardless of the exact colors.
 
 ## When to invoke
 
 Trigger whenever the user asks for a new page on slszonwering.nl, e.g.:
-- "create a page about zonnescherm X"
-- "publish a landing page for rolluiken"
-- "maak een pagina over markiezen"
-- "add a new service page for terrasoverkapping"
+- "create a page about zonwering in {stad}"
+- "publish a landing page for {product}"
+- "maak een pagina over zonwering in Dordrecht"
+- "add a new city/service page for {plaats}"
 - "publish to slszonwering"
 
-Do NOT invoke for: blog posts, editing existing pages (use `update_content` directly once the real tool name is confirmed), or non-SLS-Zonwering sites.
+Do NOT invoke for: blog posts (use a separate blog-write skill if one exists), editing existing pages (use update_content directly), or non-SLS-Zonwering sites.
 
 ## Pipeline (always run in this order)
 
-1. **Clarify inputs** — if user did not specify, ask in ONE question:
-   - Topic / product-service name (e.g. "zonnescherm", "rolluiken", "markiezen", "terrasoverkapping")
-   - Primary keyword (focus_keyword) — default to topic slug
-   - Language: `nl-NL` (default; this is a Dutch business)
-   - CTA target URL — default to the site's contact/offerte page, e.g. `https://www.slszonwering.nl/offerte-aanvragen/` (confirm the real path before first use)
+1. **Clarify inputs** — if user did not specify, ask in ONE `ask_user_question` call:
+   - Page type: **city/local page** ("zonwering in {plaats}") or **product page** (e.g. knikarmscherm, screens, markiezen, rolluiken, hybride rolluik, jaloezieën, verticale lamellen, plissegordijnen, terrasoverkapping)
+   - Plaats name (if local page) or product name (if product page)
+   - Primary keyword (focus_keyword) — default to `zonwering in {plaats}` or `{product} zonwering`
+   - Language: `nl-NL` (default; SLS Zonwering serves Dutch-speaking customers)
+   - CTA target: default to the contact/offerte form, fallback `mailto:info@slszonwering.nl`
 2. **Generate the page** — build full HTML using the Template below (single `render_html` field, CSS inline, scripts at end).
-3. **Publish via WordPress MCP** — call the `sls-zonwering` MCP server's content-creation tool (name unconfirmed — see warning above; try `create_content` first, and if it doesn't exist, run tool discovery against the connected server before publishing).
-4. **Verify** — read the created page back (e.g. `get_content`) with the returned ID; confirm `render_html` saved and `status=publish`. Report the live URL to the user.
+3. **Publish via WordPress MCP** — call the site's WordPress MCP server → `create_content` with the parameters listed in §Publish Parameters.
+4. **Verify** — call `get_content` with the returned ID; confirm `render_html` saved and `status=publish`. Report the live URL to the user.
+
+I don't have confirmed access to the specific WordPress MCP server name/connector for this site — verify which MCP connector is available before step 3, and confirm the exact `create_content` field names against that connector's schema rather than assuming they match the example below.
 
 ## Template — required structure
 
-Every page follows this section order. Use a consistent 2-3 letter class prefix — default to `sz-` for SLS Zonwering pages.
+Every page MUST follow this section order. Use the **class prefix** `sls-` (or a topic-specific prefix like `slz-` for a specific product) — pick one and stay consistent within the page.
 
 ### Section list (in order)
 
 | # | Section | Required | Notes |
 |---|---|---|---|
 | 1 | `<head>` with SEO meta + JSON-LD | yes | See §Head block |
-| 2 | Hero | yes | 2-col grid: copy + product image, badge, H1 with gradient span, lead, CTA button, 4 stats |
-| 3 | How it works | yes | 4 steps in a 4-col grid (e.g. adviesgesprek → opmeten → maatwerk productie → montage) |
-| 4 | Process timeline (optional) | no | Use only for topics with 5+ sequential phases |
-| 5 | What you get | yes | 6 cards in 2-col grid, each with icon + H3 + p (materials, warranty, options, motorisatie, onderhoud, service) |
-| 6 | FAQ | yes | 5 accordion items, click-to-toggle, chevron rotates |
-| 7 | Scripts | yes | FAQ accordion toggle + header nav init (see §Scripts) |
+| 2 | Hero | yes | 2-col grid: copy + image, badge, H1 with plaats/product name, lead, CTA button, trust stats (e.g. jaren ervaring, aantal projecten) |
+| 3 | Productenoverzicht (product range) | yes | Grid of the product line: knikarmschermen, screens, markiezen, rolluiken, jaloezieën, verticale lamellen, plissegordijnen, terrasoverkappingen — each a card linking to its product page |
+| 4 | Werkwijze (how it works) | yes | 3-4 steps: adviesgesprek/opmeten → offerte → montage → nazorg |
+| 5 | Waarom SLS Zonwering (why us) | yes | 4-6 cards: maatwerk, jarenlange ervaring, eigen montage, garantie |
+| 6 | Lokale relevantie (local page only) | conditional | 1-2 paragraphs naming the plaats, nearby wijken/streets if known, and why local service matters (measure-on-site, local montage team) |
+| 7 | FAQ | yes | 4-6 accordion items, click-to-toggle, chevron rotates — reuse the FAQ content style already used on the live "Hybride Rolluik" page (prijs, maatwerk, elektrische bediening, offerte aanvragen) |
+| 8 | Scripts | yes | FAQ accordion toggle + header nav init (see §Scripts) |
 
 ### Head block (always include)
 
@@ -71,239 +70,100 @@ Every page follows this section order. Use a consistent 2-3 letter class prefix 
 <meta property="og:description" content="{meta description}">
 <meta name="twitter:description" content="{meta description}">
 <meta name="twitter:card" content="summary">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Service","mainEntityOfPage":{"@type":"WebPage","@id":"https://www.slszonwering.nl/{slug}/"},"headline":"{title}","description":"{meta description}","url":"https://www.slszonwering.nl/{slug}/","datePublished":"{ISO 8601 now}","dateModified":"{ISO 8601 now}","provider":{"@type":"LocalBusiness","name":"SLS Zonwering","url":"https://www.slszonwering.nl/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"LocalBusiness","name":"SLS Zonwering","description":"{meta description}","url":"https://www.slszonwering.nl/{slug}/","email":"info@slszonwering.nl","areaServed":"{plaats}"}</script>
 <style>
 html, body { height: auto; }
 body { overflow-x: hidden; }
-.sz-header-container { position: sticky; top: 0; z-index: 99999; }
-.sz-header-nav { z-index: 999999; }
-.sz-how, .sz-deliver, .sz-faq { scroll-margin-top: 100px; }
+.sls-header-container { position: sticky; top: 0; z-index: 99999; }
+.sls-header-nav { z-index: 999999; }
+.sls-how, .sls-deliver, .sls-faq { scroll-margin-top: 100px; }
 </style>
 </head>
 <body>
 ```
 
-### Design system (PLACEHOLDER — confirm against the real site before publishing)
+### Design system (best-estimate — verify against the live site before use)
 
-- **Font**: `Inter` (400, 500, 600, 700, 800) via Google Fonts `@import` — unverified, check the live site's actual font
-- **Icons**: FontAwesome 6.5.1 via `@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css')`
-- **Primary gradient (placeholder — sun/shade theme)**: `linear-gradient(90deg, #F59E0B, #1E3A8A)` (amber → deep blue) — used for H1 gradient span, primary buttons, icon backgrounds
-- **Secondary gradient (icons)**: `linear-gradient(180deg, #FB923C 0%, #1E40AF 100%)`
-- **Text colors**: H1/H2 `#111827`, body `#4B5563`, muted `#6B7280`, dark `#374151`
-- **Backgrounds**: hero `#ffffff`, how `#ffffff`, deliver `#f8fafc`, FAQ `#ffffff`
-- **Borders**: card `#E5E7EB`, hover `#1E40AF`
-- **Border radius**: cards `16px`, buttons `10px`, pill `9999px`, icons `999px`
-- **Section padding**: hero `72px 24px`, others `86px 24px`
-- **H1**: `56px / weight 800 / line-height 1.06 / letter-spacing -0.03em`
-- **H2**: `42px / weight 800 / line-height 1.2 / letter-spacing -0.025em`
-- **Animation**: fade-up keyframe (`opacity 0→1, translateY 18px→0`, `.6s ease-out forwards`) with staggered `animation-delay` per child
+- **Font**: system-safe sans-serif (e.g. `Inter` or similar) via Google Fonts `@import` inside the first section's `<style>` — confirm the actual font against the live page
+- **Icons**: FontAwesome (or the icon set already used on the site) via CDN `@import`
+- **Suggested palette** (unverified — sun/shade theme, common for zonwering companies): warm accent (amber/orange, e.g. `#E8871E`–`#F2A93C`) for CTAs and highlights, cool neutral (dark navy/slate, e.g. `#1F2937`) for headings, white/light-grey backgrounds for content sections
+- **Text colors**: headings dark neutral, body mid-grey, muted light-grey — verify exact hex against live CSS
+- **Border radius**: cards `12-16px`, buttons `8-10px`, pill `9999px`
+- **Max widths**: hero wrapper `1200px`, content blocks `800-860px`
+- **Section padding**: hero `72px 24px`, others `80-86px 24px`
+- **H1**: roughly `48-56px / bold / tight line-height`
+- **H2**: roughly `36-42px / bold`
 
-**Before first real publish**: replace this section with the actual brand colors, font, logo, and hero image URL pulled from the live site or supplied by the site owner.
+Treat every value in this section as a placeholder until confirmed — do not present it to the user as the site's real brand system without checking.
 
 ### Hero section skeleton
 
 ```html
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-  .sz-hero-container{font-family:'Inter',sans-serif;background:#ffffff;color:#111827;padding:72px 24px;overflow:hidden;position:relative}
-  .sz-hero-wrapper{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:52px;position:relative;z-index:2}
-  .sz-badge{display:inline-block;padding:7px 12px;background:#fff;color:#1E40AF;font-size:14px;font-weight:700;border-radius:9999px;margin-bottom:18px;border:1px solid rgba(30,64,175,.18)}
-  .sz-h1{font-size:56px;font-weight:800;line-height:1.06;margin:0 0 18px 0;color:#111827;letter-spacing:-0.03em}
-  .sz-gradient{background:linear-gradient(90deg,#F59E0B,#1E3A8A);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .sz-lead{font-size:18px;line-height:1.7;color:#4B5563;margin:0 0 26px 0;max-width:560px}
-  .sz-btns{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 44px 0}
-  .sz-btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 26px;font-size:16px;font-weight:700;border-radius:10px;text-decoration:none;border:2px solid transparent;transition:all .28s ease;cursor:pointer}
-  .sz-primary{background:linear-gradient(90deg,#F59E0B,#1E3A8A);color:#fff}
-  .sz-primary:hover{opacity:.92;box-shadow:0 12px 22px -6px rgba(30,64,175,.28);transform:translateY(-2px)}
-  .sz-stats{display:grid;grid-template-columns:1fr 1fr;gap:28px}
-  .sz-stat-num{font-size:34px;font-weight:800;color:#111827;letter-spacing:-0.02em}
-  .sz-stat-label{font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.08em}
-  .sz-imgwrap{position:relative;display:flex;justify-content:center;align-items:center}
-  .sz-imgwrap img{width:100%;max-width:600px;border-radius:18px;box-shadow:0 26px 52px -16px rgba(0,0,0,.25)}
-  @media(max-width:768px){.sz-hero-wrapper{grid-template-columns:1fr;text-align:center}.sz-h1{font-size:40px}.sz-lead{margin-left:auto;margin-right:auto}.sz-btns{justify-content:center}.sz-imgwrap{order:1}}
-  @media(max-width:480px){.sz-h1{font-size:28px}.sz-hero-container{padding:52px 16px}.sz-stats{grid-template-columns:1fr;gap:18px}}
-  @media(max-width:360px){.sz-h1{font-size:24px}.sz-hero-container{padding:44px 14px}}
+  .sls-hero-container{font-family:'Inter',sans-serif;background:#ffffff;color:#1F2937;padding:72px 24px;overflow:hidden;position:relative}
+  .sls-hero-wrapper{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:52px;position:relative;z-index:2}
+  .sls-badge{display:inline-block;padding:7px 12px;background:#fff;color:#E8871E;font-size:14px;font-weight:700;border-radius:9999px;margin-bottom:18px;border:1px solid rgba(232,135,30,.25)}
+  .sls-h1{font-size:52px;font-weight:800;line-height:1.1;margin:0 0 18px 0;color:#1F2937;letter-spacing:-0.02em}
+  .sls-accent{color:#E8871E}
+  .sls-lead{font-size:18px;line-height:1.7;color:#4B5563;margin:0 0 26px 0;max-width:560px}
+  .sls-btns{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 44px 0}
+  .sls-btn{display:inline-flex;align-items:center;justify-content:center;padding:14px 26px;font-size:16px;font-weight:700;border-radius:10px;text-decoration:none;border:2px solid transparent;transition:all .28s ease;cursor:pointer}
+  .sls-primary{background:#E8871E;color:#fff}
+  .sls-primary:hover{opacity:.92;box-shadow:0 12px 22px -6px rgba(232,135,30,.28);transform:translateY(-2px)}
+  .sls-stats{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+  .sls-stat-num{font-size:32px;font-weight:800;color:#1F2937}
+  .sls-stat-label{font-size:12px;color:#6B7280;text-transform:uppercase;letter-spacing:.08em}
+  .sls-imgwrap{position:relative;display:flex;justify-content:center;align-items:center}
+  .sls-imgwrap img{width:100%;max-width:600px;border-radius:16px;box-shadow:0 26px 52px -16px rgba(0,0,0,.2)}
+  @media(max-width:768px){.sls-hero-wrapper{grid-template-columns:1fr;text-align:center}.sls-h1{font-size:38px}.sls-lead{margin-left:auto;margin-right:auto}.sls-btns{justify-content:center}.sls-imgwrap{order:1}}
+  @media(max-width:480px){.sls-h1{font-size:28px}.sls-hero-container{padding:52px 16px}.sls-stats{grid-template-columns:1fr;gap:18px}}
+  @media(max-width:360px){.sls-h1{font-size:24px}.sls-hero-container{padding:44px 14px}}
 </style>
 
-<div class="sz-hero-container">
-  <div class="sz-hero-wrapper">
-    <div class="sz-hero-content">
-      <span class="sz-badge">☀️ {badge text}</span>
-      <h1 class="sz-h1">{H1 line 1}<br><span class="sz-gradient">{H1 gradient line}</span></h1>
-      <p class="sz-lead">{lead paragraph with <strong>bold</strong> keywords}</p>
-      <div class="sz-btns">
-        <a class="sz-btn sz-primary" href="{CTA url}">{CTA label} →</a>
+<div class="sls-hero-container">
+  <div class="sls-hero-wrapper">
+    <div class="sls-hero-content">
+      <span class="sls-badge">☀️ {badge text, e.g. "Zonwering specialist in {plaats}"}</span>
+      <h1 class="sls-h1">Zonwering in <span class="sls-accent">{plaats}</span></h1>
+      <p class="sls-lead">{lead paragraph naming the plaats and the product range, with <strong>zonwering {plaats}</strong> as the focus keyword}</p>
+      <div class="sls-btns">
+        <a class="sls-btn sls-primary" href="{CTA url}">Vraag een gratis offerte aan →</a>
       </div>
-      <div class="sz-stats">
-        <div><div class="sz-stat-num">{stat1}</div><span class="sz-stat-label">{label1}</span></div>
-        <div><div class="sz-stat-num">{stat2}</div><span class="sz-stat-label">{label2}</span></div>
-        <div><div class="sz-stat-num">{stat3}</div><span class="sz-stat-label">{label3}</span></div>
-        <div><div class="sz-stat-num">{stat4}</div><span class="sz-stat-label">{label4}</span></div>
+      <div class="sls-stats">
+        <div><div class="sls-stat-num">{stat1}</div><span class="sls-stat-label">{label1}</span></div>
+        <div><div class="sls-stat-num">{stat2}</div><span class="sls-stat-label">{label2}</span></div>
       </div>
     </div>
-    <div class="sz-imgwrap">
-      <img src="{real product image URL — placeholder, confirm on the live site}" alt="{descriptive alt}" onerror="this.src='https://placehold.co/600x400/1E3A8A/FFF?text=Afbeelding+Fout'; this.onerror=null;" />
+    <div class="sls-imgwrap">
+      <img src="{hero image url}" alt="Zonwering in {plaats} - SLS Zonwering" onerror="this.style.display='none'">
     </div>
   </div>
 </div>
 ```
 
-### How it works section skeleton (4 steps)
+I don't have real stat numbers (years in business, number of projects, number of reviews) for SLS Zonwering — ask the user for these or omit the stats block rather than inventing figures.
 
-```html
-<style>
-  @keyframes szFadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-  .sz-how{font-family:'Inter',sans-serif;background:#ffffff;color:#111827;padding:86px 24px;overflow:hidden}
-  .sz-how .sz-how-head{max-width:820px;margin:0 auto 60px auto;text-align:center;opacity:0;animation:szFadeUp .6s ease-out forwards;animation-delay:.08s}
-  .sz-how h2{font-size:42px;font-weight:800;line-height:1.2;letter-spacing:-0.025em;margin:0}
-  .sz-how p{font-size:18px;line-height:1.6;color:#4B5563;margin:16px 0 0 0}
-  .sz-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:30px;max-width:1200px;margin:0 auto}
-  .sz-step{text-align:center;opacity:0;animation:szFadeUp .6s ease-out forwards}
-  .sz-step:nth-child(1){animation-delay:.28s}
-  .sz-step:nth-child(2){animation-delay:.44s}
-  .sz-step:nth-child(3){animation-delay:.60s}
-  .sz-step:nth-child(4){animation-delay:.76s}
-  .sz-step-ico{width:82px;height:82px;border-radius:999px;background:linear-gradient(180deg,#FB923C 0%,#1E40AF 100%);display:inline-flex;align-items:center;justify-content:center;margin-bottom:22px;box-shadow:0 10px 20px -6px rgba(30,64,175,.35)}
-  .sz-step-ico i{font-size:36px;color:#fff}
-  .sz-step-kicker{font-size:13px;font-weight:800;color:#1E40AF;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em}
-  .sz-step h3{font-size:20px;font-weight:800;margin:0 0 10px 0}
-  .sz-step-desc{font-size:16px;line-height:1.65;color:#4B5563;margin:0}
-  @media(max-width:992px){.sz-steps{grid-template-columns:repeat(2,1fr);gap:44px}}
-  @media(max-width:768px){.sz-steps{grid-template-columns:1fr}.sz-how h2{font-size:32px}}
-  @media(max-width:480px){.sz-how h2{font-size:26px}.sz-how{padding:52px 16px}}
-  @media(max-width:360px){.sz-how h2{font-size:22px}.sz-how{padding:44px 14px}}
-</style>
-
-<div class="sz-how" id="feature">
-  <div class="sz-how-head">
-    <h2>{how it works H2, e.g. "Zo werkt het"}</h2>
-    <p>{how it works subtitle}</p>
-  </div>
-  <div class="sz-steps">
-    <!-- repeat 4x, e.g. Adviesgesprek, Opmeten, Maatwerk productie, Montage -->
-    <div class="sz-step">
-      <div class="sz-step-ico"><i class="fa-solid fa-{icon}"></i></div>
-      <div class="sz-step-kicker">{Stap 1}</div>
-      <h3>{step title}</h3>
-      <p class="sz-step-desc">{step description}</p>
-    </div>
-  </div>
-</div>
-```
-
-### What you get section skeleton (6 cards)
-
-```html
-<style>
-  .sz-deliver{font-family:'Inter',sans-serif;background:#f8fafc;color:#111827;padding:86px 24px;overflow:hidden}
-  .sz-deliver .head{max-width:860px;margin:0 auto 46px auto;text-align:center;opacity:0;animation:szFadeUp .6s ease-out forwards;animation-delay:.08s}
-  .sz-deliver .head h2{font-size:42px;font-weight:800;line-height:1.2;letter-spacing:-0.025em;margin:0}
-  .sz-deliver .head p{font-size:18px;line-height:1.6;color:#4B5563;margin:16px auto 0 auto;max-width:700px}
-  .sz-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:22px;max-width:1020px;margin:0 auto}
-  .sz-card{display:flex;align-items:flex-start;gap:16px;background:#fff;border:1px solid #E5E7EB;border-radius:16px;padding:22px;box-shadow:0 4px 12px -1px rgba(0,0,0,.03),0 2px 8px -1px rgba(0,0,0,.02);transition:all .28s ease;opacity:0;animation:szFadeUp .6s ease-out forwards}
-  .sz-card:hover{transform:translateY(-4px);border-color:#1E40AF;box-shadow:0 12px 22px -10px rgba(0,0,0,.12)}
-  .sz-card:nth-child(1){animation-delay:.26s}
-  .sz-card:nth-child(2){animation-delay:.34s}
-  .sz-card:nth-child(3){animation-delay:.42s}
-  .sz-card:nth-child(4){animation-delay:.50s}
-  .sz-card:nth-child(5){animation-delay:.58s}
-  .sz-card:nth-child(6){animation-delay:.66s}
-  .sz-icobox{flex-shrink:0;width:34px;height:34px;border-radius:999px;background:linear-gradient(180deg,#FB923C 0%,#1E40AF 100%);display:inline-flex;align-items:center;justify-content:center}
-  .sz-icobox i{color:#fff;font-size:14px}
-  .sz-card h3{font-size:18px;font-weight:800;margin:0 0 6px 0}
-  .sz-card p{font-size:16px;line-height:1.65;color:#4B5563;margin:0}
-  .sz-footer{max-width:900px;margin:44px auto 0 auto;text-align:center;opacity:0;animation:szFadeUp .6s ease-out forwards;animation-delay:.78s}
-  .sz-footer p{font-size:18px;font-weight:600;color:#374151;line-height:1.65;margin:0 0 26px 0}
-  .sz-pill{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-size:16px;font-weight:800;color:#fff;background:linear-gradient(90deg,#FB923C 0%,#F59E0B 50%,#1E40AF 100%);background-size:200% auto;padding:14px 28px;border-radius:9999px;transition:all .35s ease;box-shadow:0 5px 18px rgba(30,64,175,.30)}
-  .sz-pill:hover{background-position:right center;transform:translateY(-2px);box-shadow:0 8px 24px rgba(30,64,175,.35)}
-  .sz-pill i{margin-left:10px;font-size:14px;transition:transform .2s ease}
-  .sz-pill:hover i{transform:translateX(4px)}
-  @media(max-width:768px){.sz-cards{grid-template-columns:1fr}.sz-deliver .head h2{font-size:32px}}
-  @media(max-width:480px){.sz-deliver .head h2{font-size:26px}.sz-deliver{padding:52px 16px}}
-  @media(max-width:360px){.sz-deliver .head h2{font-size:22px}.sz-deliver{padding:44px 14px}}
-</style>
-
-<div class="sz-deliver" id="review">
-  <div class="head">
-    <h2>{what you get H2, e.g. "Wat je krijgt"}</h2>
-    <p>{what you get subtitle}</p>
-  </div>
-  <div class="sz-cards">
-    <!-- repeat 6x, e.g. materiaalkeuze, motorisatie, garantie, onderhoudsservice, kleuren/stoffen, montage door eigen team -->
-    <div class="sz-card"><div class="sz-icobox"><i class="fa-solid fa-check"></i></div><div><h3>{card title}</h3><p>{card description}</p></div></div>
-  </div>
-  <div class="sz-footer">
-    <p>{closing line}</p>
-    <a class="sz-pill" href="{CTA url}">{CTA label} <i class="fa-solid fa-arrow-right"></i></a>
-  </div>
-</div>
-```
-
-### FAQ section skeleton (5 accordion items)
-
-```html
-<style>
-  .sz-faq{font-family:'Inter',sans-serif;background:#ffffff;color:#111827;padding:86px 24px;overflow:hidden}
-  .sz-faq .head{max-width:860px;margin:0 auto 46px auto;text-align:center;opacity:0;animation:szFadeUp .6s ease-out forwards;animation-delay:.08s}
-  .sz-faq .head h2{font-size:42px;font-weight:800;line-height:1.2;letter-spacing:-0.025em;margin:0}
-  .sz-faq .head p{font-size:18px;line-height:1.6;color:#4B5563;margin:16px 0 0 0}
-  .sz-faq-list{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
-  .sz-faq-item{background:#fff;border:1px solid #E5E7EB;border-radius:16px;box-shadow:0 4px 12px -1px rgba(0,0,0,.03),0 2px 8px -1px rgba(0,0,0,.02);transition:all .28s ease;opacity:0;animation:szFadeUp .6s ease-out forwards}
-  .sz-faq-item:nth-child(1){animation-delay:.26s}
-  .sz-faq-item:nth-child(2){animation-delay:.34s}
-  .sz-faq-item:nth-child(3){animation-delay:.42s}
-  .sz-faq-item:nth-child(4){animation-delay:.50s}
-  .sz-faq-item:nth-child(5){animation-delay:.58s}
-  .sz-q{display:flex;justify-content:space-between;align-items:flex-start;width:100%;text-align:left;padding:22px 22px;font-size:18px;font-weight:750;color:#111827;background:transparent;border:none;cursor:pointer;border-radius:16px}
-  .sz-q:hover{background:#f8fafc}
-  .sz-q span{flex:1;margin-right:14px;line-height:1.4}
-  .sz-q i{font-size:16px;color:#1E40AF;transition:transform .3s ease;flex-shrink:0;padding-top:4px}
-  .sz-a{max-height:0;overflow:hidden;padding:0 22px;border-top:1px solid #E5E7EB;margin-top:-1px;transition:max-height .4s ease,padding .4s ease}
-  .sz-a p{margin:0;font-size:16px;line-height:1.65;color:#4B5563}
-  .sz-faq-item.active .sz-a{max-height:360px;padding:18px 22px 22px 22px}
-  .sz-faq-item.active .sz-q{color:#1E40AF}
-  .sz-faq-item.active .sz-q i{transform:rotate(180deg)}
-  @media(max-width:768px){.sz-faq .head h2{font-size:32px}.sz-q{font-size:16px;padding:18px}.sz-a p{font-size:15px}.sz-q i{padding-top:2px}}
-  @media(max-width:480px){.sz-faq .head h2{font-size:26px}.sz-faq{padding:52px 16px}}
-  @media(max-width:360px){.sz-faq .head h2{font-size:22px}.sz-faq{padding:44px 14px}}
-</style>
-
-<div class="sz-faq" id="faq">
-  <div class="head">
-    <h2>{FAQ H2, e.g. "Veelgestelde vragen"}</h2>
-    <p>{FAQ subtitle}</p>
-  </div>
-  <div class="sz-faq-list">
-    <!-- repeat 5x -->
-    <div class="sz-faq-item">
-      <button class="sz-q"><span>{question}</span><i class="fa-solid fa-chevron-down"></i></button>
-      <div class="sz-a"><p>{answer}</p></div>
-    </div>
-  </div>
-</div>
-```
-
-### Scripts (always append at end of body)
+### Scripts (always include, end of body)
 
 ```html
 <script>
 (function(){
-  const root=document.querySelector('.sz-faq');
+  const root=document.querySelector('.sls-faq');
   if(!root) return;
-  const items=root.querySelectorAll('.sz-faq-item');
+  const items=root.querySelectorAll('.sls-faq-item');
   items.forEach(it=>{
-    const btn=it.querySelector('.sz-q');
+    const btn=it.querySelector('.sls-q');
     if(!btn) return;
     btn.addEventListener('click',()=>{it.classList.toggle('active');});
   });
 })();
 </script>
-
 <script>
 (function(){
   function initHeaderNav(){
-    var toggle = document.querySelector('.sz-mobile-toggle');
-    var nav = document.querySelector('.sz-header-nav');
+    var toggle = document.querySelector('.sls-mobile-toggle');
+    var nav = document.querySelector('.sls-header-nav');
     if(!toggle || !nav) return;
     if(toggle.dataset.bound === '1') return;
     toggle.dataset.bound = '1';
@@ -319,37 +179,34 @@ body { overflow-x: hidden; }
 
 ## Mobile responsiveness — 4 breakpoints (MANDATORY)
 
-Every page MUST include all 4 breakpoints (already baked into the skeletons above):
-
 | Breakpoint | Size | Key adjustments |
 |---|---|---|
-| Tablet | `≤992px` | Steps grid → 2 columns, gap 44px |
-| Mobile | `≤768px` | All grids → 1 column, H1 40px, H2 32px, hero text centered, image `order:1`, FAQ font 16px |
-| Small Mobile | `≤480px` | H1 28px, H2 24-26px, stats → 1 column, tighter padding (52px 16px) |
-| Extra Small | `≤360px` | H1 24px, H2 22px, minimal section padding (44px 14px) |
+| Tablet | `≤992px` | Product/step grids → 2 columns |
+| Mobile | `≤768px` | All grids → 1 column, H1 ~38px, H2 ~28px, hero text centered, image `order:1` |
+| Small Mobile | `≤480px` | H1 ~28px, H2 ~24px, stats → 1 column, tighter padding (52px 16px) |
+| Extra Small | `≤360px` | H1 ~24px, H2 ~22px, minimal section padding (44px 14px) |
 
 ## SEO / AEO / GEO content rules
 
-1. **Answer-first**: hero lead and FAQ answers must open with the direct answer in the first sentence, then context.
-2. **Primary keyword** appears in: title tag, H1, meta description, first 100 words, at least one H3, one FAQ answer, and the URL slug.
-3. **Citeerbare passages**: include 1-2 short, fact-dense sentences (materiaal, garantietermijn, levertijd, etc.) that AI-zoekmachines letterlijk kunnen overnemen.
-4. **Entities**: name concrete product types (screens, uitvalschermen, rolluiken, markiezen, terrasoverkappingen, jaloezieën) rather than only the generic term "zonwering".
-5. **Schema**: JSON-LD `Service`/`LocalBusiness` type in head (default). Add `FAQPage` schema additionally if the page is FAQ-heavy.
-6. **Language**: Dutch (`nl-NL`) with `lang="nl-NL"` on `<html>`.
-7. **Internal links**: link to the site's offerte/contact page as primary CTA (confirm the real path — placeholder used above). Add 1-2 contextual internal links to related product pages where natural.
-8. **No header/footer**: pages use `use_global_header: false` / `use_global_footer: false` (assumed to match the quasaraiseo Custom Web Render convention — confirm once the MCP tool is reachable) — the HTML is fully self-contained.
+1. **Answer-first**: hero lead and FAQ answers open with the direct answer in the first sentence, then context.
+2. **Primary keyword** (`zonwering in {plaats}` or `{product} zonwering`) appears in: title tag, H1, meta description, first 100 words, at least one H3, one FAQ answer, and the URL slug — matching the existing pattern seen on live pages such as `/zonwering-in-zwijndrecht/` and `/zonwering-in-gorinchem/`.
+3. **Citeerable passages**: 1-2 short, fact-dense sentences AI engines can lift verbatim — only include numbers (prices, years of experience, project counts) that the user has actually confirmed; do not invent them.
+4. **Local entity signals**: name the plaats, and — where the user confirms them — nearby service areas, so the page reads as genuinely local rather than templated.
+5. **Product entities**: name the real SLS Zonwering product range explicitly where relevant: knikarmschermen, screens, markiezen, rolluiken (incl. hybride rolluik), jaloezieën, verticale lamellen, plissegordijnen, terrasoverkappingen.
+6. **Schema**: `LocalBusiness` (or `Service` for product pages) JSON-LD in head. Add `FAQPage` schema as a second JSON-LD block if the page is FAQ-heavy, matching the visible FAQ.
+7. **Language**: Dutch (`nl-NL`) — SLS Zonwering's existing pages are entirely in Dutch.
+8. **Internal links**: link to the contact/offerte page as primary CTA; add 1-2 contextual internal links to related product or nearby-plaats pages.
 9. **Title tag**: ≤60 chars, format `{Page topic} | SLS Zonwering`.
-10. **Meta description**: 150-160 chars, includes primary keyword + a verb + value proposition.
+10. **Meta description**: 150-160 chars, includes the primary keyword + a verb + value proposition (e.g. "gratis offerte", "op maat gemaakt").
+11. **Contact info**: use `info@slszonwering.nl` as the confirmed contact email; do not invent a phone number or physical address unless the user supplies one.
 
-## Publish parameters — call the `sls-zonwering` MCP server's content tool
-
-**Tool name unconfirmed** (see warning at top). Structure below mirrors the quasaraiseo `create_content` call for the same "Custom Web Render" plugin route; verify field names once the server actually connects.
+## Publish parameters — call the site's WordPress MCP `create_content`
 
 ```json
 {
   "post_type": "page",
   "title": "{title tag without | SLS Zonwering suffix}",
-  "slug": "{kebab-case-slug}",
+  "slug": "zonwering-in-{plaats-kebab-case}",
   "status": "publish",
   "content": "{short plain-text excerpt of the lead paragraph, ~200 chars}",
   "excerpt": "{1-sentence summary}",
@@ -359,24 +216,23 @@ Every page MUST include all 4 breakpoints (already baked into the skeletons abov
   "canonical_url": "https://www.slszonwering.nl/{slug}/",
   "robots_noindex": false,
   "robots_nofollow": false,
-  "schema_type": "Service",
+  "schema_type": "LocalBusiness",
   "social_title": "{full title tag}",
   "social_description": "{meta description}",
-  "social_image": "{real social share image URL — confirm on the live site}",
   "render_enabled": true,
   "render_html": "{FULL HTML DOCUMENT from <!doctype html> through </html>}",
   "render_css": "",
   "render_javascript": "",
-  "use_global_header": false,
-  "use_global_footer": false
+  "use_global_header": true,
+  "use_global_footer": true
 }
 ```
 
-**Important**: All CSS and JS must be inlined inside `render_html`. Leave `render_css` and `render_javascript` empty strings.
+I'm not certain whether SLS Zonwering's existing pages use a global header/footer (`use_global_header`/`use_global_footer` set to `true`) or fully self-contained pages like the QuasarAISEO example (`false`) — the live pages appear to share a common site header/nav across URLs, so `true` is the more likely default, but confirm this against how an existing page (e.g. `/zonwering-in-zwijndrecht/`) is actually built before publishing. Also verify the exact field names against whichever WordPress MCP connector is actually configured — the schema above is inferred from the QuasarAISEO example, not confirmed for this site.
 
 ## Verification step (always run after publish)
 
-1. Read the created page back by ID (e.g. `get_content`).
+1. Call `get_content` with the returned `id`.
 2. Confirm: `status` is `publish`, `render_html` is non-empty, `slug` matches, `canonical_url` matches.
 3. Report to user:
    - Live URL: `https://www.slszonwering.nl/{slug}/`
@@ -385,19 +241,15 @@ Every page MUST include all 4 breakpoints (already baked into the skeletons abov
    - Meta description
    - Focus keyword
 
-## Reference files
-
-None yet — unlike the QuasarAISEO skill, there are no confirmed example HTML files for this site's actual template in this repo. Once a real page is published (or an existing page's HTML is pulled from the site), save it here as a reference file and link it from this section.
-
 ## Class prefix convention
 
-Default to `sz-` for SLS Zonwering pages, kept consistent for every class on a given page to avoid CSS collisions between pages.
+Use `sls-` for general/local pages, or a short product-specific prefix (e.g. `hr-` for hybride rolluik, `km-` for knikarmscherm) if building a dedicated product landing page, to avoid CSS collisions between pages on the same site.
 
 ## Common pitfalls to avoid
 
-- Do NOT include `<!doctype html>`/`<html>`/`<head>`/`<body>` tags twice — `render_html` expects one complete document.
+- Do NOT include `<!doctype html>`/`<html>`/`<head>`/`<body>` tags twice.
 - Do NOT use external CSS files — all styles must be in `<style>` tags inside `render_html`.
-- Do NOT enable global header/footer until confirmed this site's Custom Web Render setup wants them off (assumed off here, matching quasaraiseo).
-- Do NOT forget the `onerror` fallback on the hero image.
-- Do NOT skip the FAQ accordion script.
-- Do NOT publish with the placeholder design tokens/colors still in place for a real client-facing page — confirm brand colors first.
+- Do NOT invent trust statistics, review counts, prices, phone numbers, or addresses — ask the user or omit.
+- Do NOT forget the `onerror` fallback on hero/product images.
+- Do NOT skip the FAQ accordion script — without it the FAQ items won't toggle.
+- Do NOT assume the design tokens in this file are final — verify colors/fonts against a live page before the first real publish, and update this file once confirmed.
